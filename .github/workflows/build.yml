@@ -1,0 +1,132 @@
+name: Build APK
+
+# 构建产物：
+#   mobile-arm64_v8a / mobile-armeabi_v7a / leanback-arm64_v8a / leanback-armeabi_v7a
+# 触发：
+#   1. push 到 main            → 编译并把 APK 上传为 workflow artifact（不入 Release）
+#   2. push 标签 v*            → 编译 + 创建 GitHub Release 并附上 APK
+#   3. Pull Request            → 仅编译校验
+#   4. 手动 workflow_dispatch  → 同 push to main
+#
+# 签名（可选）：仓库 Secrets 里配置以下三项即产出可安装的正式签名包；
+#   缺省时产出未签名 APK（文件名带 -unsigned，安装会失败，仅供校验用）。
+#     KEYSTORE_BASE64    release.jks 的 base64（`base64 -w0 release.jks`）
+#     KEY_ALIAS          keystore 里的 key alias
+#     KEYSTORE_PASSWORD  keystore 与 key 的密码（本项目两者相同）
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Assemble release APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK platform and build-tools
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platform-tools" "platforms;android-37" "build-tools;37.0.0" \
+            || echo "::warning::SDK 组件预装失败，交由 AGP 在构建时自动下载"
+
+      - name: Resolve version from ChangeLog
+        id: ver
+        run: |
+          set -uo pipefail
+          VER=$(grep -m1 -oE '\(v?[0-9]+\.[0-9]+\.[0-9]+\)' docs/ChangeLog.md | tr -d '()v')
+          CODE=$(grep -m1 -oE '^##[[:space:]]+\[?[0-9]{4}-[0-9]{2}-[0-9]{2}' docs/ChangeLog.md \
+                 | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | tr -d '-')
+          VER=${VER:-0.0.0}
+          CODE=${CODE:-0}
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE"    >> "$GITHUB_OUTPUT"
+          echo "ChangeLog 解析结果：versionName=$VER  versionCode=$CODE"
+
+      - name: Configure signing
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          set -uo pipefail
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            {
+              echo "storeFile=$RUNNER_TEMP/release.jks"
+              echo "keyAlias=$KEY_ALIAS"
+              echo "storePassword=$KEYSTORE_PASSWORD"
+            } > local.properties
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "已注入发布签名配置"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::未配置 KEYSTORE_BASE64，本次产出未签名 APK，无法直接安装"
+          fi
+
+      - name: Build release APKs
+        run: ./gradlew assembleMobileRelease assembleLeanbackRelease --stacktrace
+
+      - name: Collect APKs
+        run: |
+          set -uo pipefail
+          VER="${{ steps.ver.outputs.version }}"
+          SUFFIX=""
+          if [ "${{ steps.signing.outputs.signed }}" != "true" ]; then SUFFIX="-unsigned"; fi
+          mkdir -p dist
+          count=0
+          while IFS= read -r apk; do
+            base=$(basename "$apk" .apk)
+            cp "$apk" "dist/GoldenTVPlayer-v${VER}-${base}${SUFFIX}.apk"
+            count=$((count + 1))
+          done < <(find app/build/outputs/apk -type f -name "*.apk")
+          echo "共收集 $count 个 APK"
+          ls -lh dist/
+          if [ "$count" -eq 0 ]; then
+            echo "::error::没有产出任何 APK，请检查上面的构建日志"
+            exit 1
+          fi
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoldenTVPlayer-v${{ steps.ver.outputs.version }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true

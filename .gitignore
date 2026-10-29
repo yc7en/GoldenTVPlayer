@@ -9,6 +9,12 @@ node_modules/
 
 *.jks
 *.properties
+# 例外：这两个构建必需文件必须入库，否则干净克隆无法运行 ./gradlew
+#   gradle.properties                  = JVM 参数 / 缓存 / configuration-cache 开关
+#   gradle/wrapper/gradle-wrapper.properties = wrapper 指向的 Gradle 发行版（9.7.1）
+# 注意 local.properties（含 sdk.dir 与签名口令）仍被 *.properties 忽略，绝不入库。
+!gradle.properties
+!gradle/wrapper/gradle-wrapper.properties
 !runtime/gradle.properties
 lib-*.aar
 /Release/
