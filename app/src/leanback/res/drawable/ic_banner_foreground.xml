@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <!-- 播放三角：取自 resources/icons/app.svg，居中于 320x180 banner -->
+    <path
+        android:pathData="M143,63 L200,90 L143,117 Z"
+        android:strokeColor="#DCE9FC"
+        android:strokeWidth="10"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="143"
+                android:startY="63"
+                android:endX="200"
+                android:endY="117"
+                android:startColor="#FFFFFF"
+                android:endColor="#A6CAFB" />
+        </aapt:attr>
+    </path>
+</vector>

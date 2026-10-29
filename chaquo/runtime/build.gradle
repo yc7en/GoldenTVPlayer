@@ -1,0 +1,112 @@
+import com.android.build.api.artifact.SingleArtifact
+import com.fongmi.gradle.AbiApkPackaging
+import com.fongmi.gradle.PreparePythonAarTask
+import com.fongmi.gradle.PythonAppAssetsTask
+import com.fongmi.gradle.VerifyPythonWheelsTask
+import groovy.json.JsonSlurper
+
+import java.security.MessageDigest
+
+plugins {
+    alias libs.plugins.android.library
+    alias libs.plugins.chaquo.python
+}
+
+def repository = layout.projectDirectory.dir('../..')
+def appDirectory = repository.dir('app')
+def localProps = new Properties()
+providers.fileContents(repository.file('local.properties')).asText.get().with { localProps.load(new StringReader(it)) }
+def patchelf
+def patchelfPath = providers.gradleProperty('tvPatchelf').getOrElse(localProps.getProperty('tvPatchelf', ''))
+if (!patchelfPath.isEmpty()) {
+    patchelf = appDirectory.file(patchelfPath)
+} else {
+    def names = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows') ? ['patchelf.exe', 'patchelf'] : ['patchelf']
+    for (def directory : providers.environmentVariable('PATH').getOrElse('').split(File.pathSeparator)) {
+        if (directory.isEmpty()) continue
+        patchelf = names.collect { new File(directory, it) }.find { it.isFile() && it.canExecute() }
+        if (patchelf != null) break
+    }
+    if (patchelf == null) throw new GradleException('Python runtime packaging requires patchelf; set -PtvPatchelf=<executable> or add it to PATH')
+}
+
+android {
+    namespace = 'com.fongmi.chaquo.runtime'
+    compileSdk libs.versions.compileSdk.get().toInteger()
+
+    defaultConfig {
+        minSdk libs.versions.minSdk.get().toInteger()
+        targetSdk libs.versions.targetSdk.get().toInteger()
+    }
+
+    flavorDimensions = ["abi"]
+
+    productFlavors {
+        arm64 {
+            dimension "abi"
+            ndk {
+                abiFilters "arm64-v8a"
+            }
+        }
+        arm32 {
+            dimension "abi"
+            ndk {
+                abiFilters "armeabi-v7a"
+            }
+        }
+    }
+}
+
+def nativeLock = new JsonSlurper().parseText(providers.fileContents(layout.projectDirectory.file('native.lock.json')).asText.get())
+nativeLock.manifests.each { name, metadata ->
+    def manifest = layout.projectDirectory.file("${name}/manifest.json")
+    if (!manifest.asFile.isFile()) throw new GradleException('Python native inputs are missing; run python scripts/sync_python_runtime.py from the TV root')
+    def bytes = providers.fileContents(manifest).asBytes.get()
+    if (MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() != metadata.sha256) throw new GradleException('Python native inputs do not match native.lock.json; run python scripts/sync_python_runtime.py from the TV root')
+}
+def nativeWheels = new JsonSlurper().parseText(providers.fileContents(layout.projectDirectory.file('wheels/manifest.json')).asText.get())
+
+chaquopy {
+    defaultConfig {
+        version = "3.10"
+        pip {
+            install("-r", "requirements.txt")
+        }
+    }
+    productFlavors {
+        AbiApkPackaging.ABI_FLAVORS.each { name, abi ->
+            named(name) {
+                pip {
+                    nativeWheels.abis[abi].wheels.each { wheel -> install("wheels/${wheel.file}") }
+                }
+            }
+        }
+    }
+}
+
+def appAssets = tasks.register('packagePythonAppAssets', PythonAppAssetsTask) {
+    from repository.dir('chaquo/src/main/python')
+    assetsDirectory.set(layout.buildDirectory.dir('generated/pythonAppAssets'))
+}
+
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    def flavor = variant.productFlavors.find { it.first == 'abi' }.second
+    def abi = AbiApkPackaging.ABI_FLAVORS[flavor]
+    def wheels = nativeWheels.abis[abi].wheels
+    def verified = tasks.register("verify${variant.name.capitalize()}PythonWheels", VerifyPythonWheelsTask) { task ->
+        task.wheels.from(wheels.collect { layout.projectDirectory.file("wheels/${it.file}") })
+        task.expectedHashes.set(wheels.collectEntries { [(it.file): it.sha256] })
+    }
+    def requirementsTask = "install${variant.name.capitalize()}PythonRequirements"
+    tasks.matching { it.name == requirementsTask }.configureEach { dependsOn(verified) }
+    def prepared = tasks.register("prepare${variant.name.capitalize()}PythonAar", PreparePythonAarTask) { task ->
+        task.abi.set(abi)
+        task.cxxAar.set(repository.file(providers.gradleProperty('tvCxxAar').getOrElse('app/libs/libcxx-shared.aar')))
+        task.patchelfFile.set(patchelf)
+        task.appArchive.set(appAssets.flatMap { it.archiveFile })
+        task.nativeArchive.set(layout.projectDirectory.file("native-bundles/python-native-${abi}.zip"))
+        task.nativeMetadata.set(layout.projectDirectory.file('native-bundles/manifest.json'))
+        task.runtimeVersion.set(libs.versions.python)
+    }
+    variant.artifacts.use(prepared).wiredWithFiles({ it.inputArchive }, { it.outputArchive }).toTransform(SingleArtifact.AAR.INSTANCE)
+}

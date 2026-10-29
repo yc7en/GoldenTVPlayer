@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 品牌圆形底：深色渐变 + 细描边，与桌面图标一致 -->
+    <path
+        android:pathData="M54,54m-52,0a52,52 0 1,1 104,0a52,52 0 1,1 -104,0"
+        android:strokeColor="#3A4350"
+        android:strokeWidth="2">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="10"
+                android:startY="10"
+                android:endX="98"
+                android:endY="98"
+                android:startColor="#2C3138"
+                android:endColor="#14181D" />
+        </aapt:attr>
+    </path>
+    <!-- 播放三角：与 ic_launcher_foreground 同款 -->
+    <path
+        android:pathData="M42.61,32.06 L75.94,54 L42.61,75.94 Z"
+        android:strokeColor="#DCE9FC"
+        android:strokeWidth="7.59"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="42"
+                android:startY="32"
+                android:endX="76"
+                android:endY="76"
+                android:startColor="#FFFFFF"
+                android:endColor="#A6CAFB" />
+        </aapt:attr>
+    </path>
+</vector>

@@ -1,0 +1,6 @@
+<resources>
+
+    <integer name="command_action_spacing">0</integer>
+    <integer name="command_item_spacing">16</integer>
+
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全基线（SEC-05）
+  1. base-config 允许明文：直播 CDN 与大量第三方源仍为 http://，全面禁止会直接废掉内容能力。
+  2. domain-config 对「敏感通道」强制 TLS：更新、依赖、字幕凭据、配置仓库。
+  3. 明文 URL 的播放仍受 UI 提示约束，见 docs/R-261027-0003.md §4 的残余风险说明。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">api.github.com</domain>
+        <domain includeSubdomains="true">api.assrt.net</domain>
+    </domain-config>
+</network-security-config>
