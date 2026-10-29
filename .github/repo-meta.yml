@@ -1,0 +1,14 @@
+# .github/repo-meta.yml — 由 github-repo Skill 维护，仓库元数据的唯一来源
+
+repo_name: Golden-TVPlayer
+title: 金幕影音 GoldenTVPlayer
+description: Hardened, slimmed fork of FongMi TV — Android TV & phone video player
+topics: [android, android-tv, video-player, catvod, media3, java, tv]
+project_type: other
+visibility: public
+license: GPL-3.0
+github_user: yc7en
+default_branch: main
+language: java
+version: 1.0.0
+confirmed: false

@@ -54,8 +54,16 @@ jobs:
       - name: Install SDK platform and build-tools
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platform-tools" "platforms;android-37" "build-tools;37.0.0" \
-            || echo "::warning::SDK 组件预装失败，交由 AGP 在构建时自动下载"
+          # 注意包名：SDK Platform 37 在此仓库中的包名是 platforms;android-37.0
+          # （ApiLevel 37.0，不是 android-37），故两个名字都试，任一成功即可。
+          for pkg in "platform-tools" "platforms;android-37.0" "platforms;android-37" "build-tools;37.0.0"; do
+            if sdkmanager --install "$pkg" > /dev/null 2>&1; then
+              echo "已安装 $pkg"
+            else
+              echo "::warning::$pkg 预装失败（AGP 构建时会尝试自动下载）"
+            fi
+          done
+          sdkmanager --list_installed 2>/dev/null | head -20 || true
 
       - name: Resolve version from ChangeLog
         id: ver
@@ -103,11 +111,12 @@ jobs:
           if [ "${{ steps.signing.outputs.signed }}" != "true" ]; then SUFFIX="-unsigned"; fi
           mkdir -p dist
           count=0
+          # 只取 release 产物，避免命中历史 debug 包
           while IFS= read -r apk; do
             base=$(basename "$apk" .apk)
             cp "$apk" "dist/GoldenTVPlayer-v${VER}-${base}${SUFFIX}.apk"
             count=$((count + 1))
-          done < <(find app/build/outputs/apk -type f -name "*.apk")
+          done < <(find app/build/outputs/apk -type f -path "*/release/*.apk" | sort)
           echo "共收集 $count 个 APK"
           ls -lh dist/
           if [ "$count" -eq 0 ]; then
