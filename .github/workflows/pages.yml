@@ -23,7 +23,7 @@ jobs:
         working-directory: website
     permissions:
       contents: read
-      pages: read
+      pages: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,6 +33,9 @@ jobs:
           cache-dependency-path: website/package-lock.json
       - uses: actions/configure-pages@v5
         id: pages
+        with:
+          # 仓库未启用 Pages 时自动启用（需要 pages: write 权限）
+          enablement: true
       - run: npm ci
       - run: npm run lint
       - run: npm run build

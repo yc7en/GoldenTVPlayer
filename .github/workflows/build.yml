@@ -48,22 +48,36 @@ jobs:
       - name: Set up Gradle (with cache)
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK platform and build-tools
+      - name: Provision Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          # 注意包名：SDK Platform 37 在此仓库中的包名是 platforms;android-37.0
-          # （ApiLevel 37.0，不是 android-37），故两个名字都试，任一成功即可。
+          set -uo pipefail
+          # 不依赖 android-actions/setup-android（其自身在 runner 上曾失败），
+          # 直接用 ubuntu-latest 镜像预装的 SDK；找不到 sdkmanager 时交给 AGP 自动下载。
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT"     >> "$GITHUB_ENV"
+
+          SDKM=$(command -v sdkmanager || true)
+          if [ -z "$SDKM" ]; then
+            for p in "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "$SDK_ROOT"/cmdline-tools/*/bin/sdkmanager; do
+              if [ -x "$p" ]; then SDKM="$p"; break; fi
+            done
+          fi
+          if [ -z "$SDKM" ]; then
+            echo "::warning::未找到 sdkmanager，跳过预装，交由 AGP 构建时自动下载"
+            exit 0
+          fi
+          echo "使用 sdkmanager: $SDKM"
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          # 注意：SDK Platform 37 的包名是 platforms;android-37.0（ApiLevel 37.0），
+          # 不是 android-37，故两个名字都试，任一成功即可。
           for pkg in "platform-tools" "platforms;android-37.0" "platforms;android-37" "build-tools;37.0.0"; do
-            if sdkmanager --install "$pkg" > /dev/null 2>&1; then
+            if "$SDKM" --install "$pkg" > /dev/null 2>&1; then
               echo "已安装 $pkg"
             else
               echo "::warning::$pkg 预装失败（AGP 构建时会尝试自动下载）"
             fi
           done
-          sdkmanager --list_installed 2>/dev/null | head -20 || true
 
       - name: Resolve version from ChangeLog
         id: ver
