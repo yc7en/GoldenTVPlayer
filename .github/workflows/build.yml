@@ -100,29 +100,51 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           set -uo pipefail
-          if [ -n "${KEYSTORE_BASE64:-}" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            {
-              echo "storeFile=$RUNNER_TEMP/release.jks"
-              echo "keyAlias=$KEY_ALIAS"
-              echo "storePassword=$KEYSTORE_PASSWORD"
-            } > local.properties
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-            echo "已注入发布签名配置"
-          else
+          KB="${KEYSTORE_BASE64:-}"
+          KA="${KEY_ALIAS:-}"
+          KP="${KEYSTORE_PASSWORD:-}"
+          # 只报告长度，绝不打印内容；用于快速定位「哪个 Secret 是空的 / 名字写错了」
+          mark() { if [ "$1" -gt 0 ]; then echo '已注入'; else echo '**缺失**'; fi; }
+          {
+            echo "### 签名配置检查"
+            echo ""
+            echo "| Secret | 字符数 | 状态 |"
+            echo "|---|---:|---|"
+            echo "| KEYSTORE_BASE64 | ${#KB} | $(mark ${#KB}) |"
+            echo "| KEY_ALIAS | ${#KA} | $(mark ${#KA}) |"
+            echo "| KEYSTORE_PASSWORD | ${#KP} | $(mark ${#KP}) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$KB" ] || [ -z "$KA" ] || [ -z "$KP" ]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::未配置 KEYSTORE_BASE64，本次产出未签名 APK，无法直接安装"
+            echo "::warning::签名未生效：KEYSTORE_BASE64=${#KB} KEY_ALIAS=${#KA} KEYSTORE_PASSWORD=${#KP}（字符数，0 表示该 Secret 读不到）"
+            exit 0
           fi
+
+          if ! echo "$KB" | base64 -d > "$RUNNER_TEMP/release.jks" 2>/dev/null; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::error::KEYSTORE_BASE64 解码失败，请确认粘贴的是完整的 base64（不要带换行或 BOM）"
+            exit 1
+          fi
+          {
+            echo "storeFile=$RUNNER_TEMP/release.jks"
+            echo "keyAlias=$KA"
+            echo "storePassword=$KP"
+          } > local.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "已注入发布签名配置（keystore $(stat -c%s "$RUNNER_TEMP/release.jks") 字节）"
 
       - name: Build release APKs
         run: ./gradlew assembleMobileRelease assembleLeanbackRelease --stacktrace
 
       - name: Collect APKs
+        id: collect
         run: |
           set -uo pipefail
           VER="${{ steps.ver.outputs.version }}"
           SUFFIX=""
           if [ "${{ steps.signing.outputs.signed }}" != "true" ]; then SUFFIX="-unsigned"; fi
+          echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
           mkdir -p dist
           count=0
           # 只取 release 产物，避免命中历史 debug 包
@@ -141,7 +163,7 @@ jobs:
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: GoldenTVPlayer-v${{ steps.ver.outputs.version }}
+          name: GoldenTVPlayer-v${{ steps.ver.outputs.version }}${{ steps.collect.outputs.suffix }}
           path: dist/*.apk
           if-no-files-found: error
           retention-days: 30
