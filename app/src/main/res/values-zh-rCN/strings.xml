@@ -358,6 +358,8 @@
     <!-- Search -->
     <string name="search_keyword">关键字…</string>
     <string name="search_record">历史</string>
+    <string name="search_record_clear">清空历史</string>
+    <string name="search_record_clear_tip">确定清空全部搜索历史？</string>
     <string name="search_suggest">建议</string>
     <string name="search_hot">热搜</string>
 

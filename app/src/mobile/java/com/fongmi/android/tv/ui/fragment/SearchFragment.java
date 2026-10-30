@@ -38,6 +38,7 @@ import com.fongmi.android.tv.utils.Util;
 import com.github.catvod.net.OkHttp;
 import com.google.android.flexbox.FlexDirection;
 import com.google.android.flexbox.FlexboxLayoutManager;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.net.HttpHeaders;
 
 import java.io.IOException;
@@ -103,6 +104,7 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
 
     @Override
     protected void initEvent() {
+        mBinding.recordClear.setOnClickListener(v -> onClearRecord());
         mBinding.keyword.setOnEditorActionListener((textView, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) search();
             return true;
@@ -201,9 +203,18 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
 
     @Override
     public void onDataChanged(int size) {
-        mBinding.record.setVisibility(size == 0 ? View.GONE : View.VISIBLE);
+        mBinding.recordLayout.setVisibility(size == 0 ? View.GONE : View.VISIBLE);
         mBinding.recordRecycler.setVisibility(size == 0 ? View.GONE : View.VISIBLE);
         mBinding.recordRecycler.postDelayed(() -> mBinding.recordRecycler.requestLayout(), 250);
+    }
+
+    private void onClearRecord() {
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.search_record)
+                .setMessage(R.string.search_record_clear_tip)
+                .setNegativeButton(R.string.dialog_negative, null)
+                .setPositiveButton(R.string.dialog_positive, (dialog, which) -> mRecordAdapter.clear())
+                .show();
     }
 
     @Override

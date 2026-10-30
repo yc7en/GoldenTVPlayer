@@ -33,6 +33,7 @@ import com.fongmi.android.tv.utils.ZhuToPin;
 import com.github.catvod.net.OkHttp;
 import com.google.android.flexbox.FlexDirection;
 import com.google.android.flexbox.FlexboxLayoutManager;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.net.HttpHeaders;
 
 import java.io.IOException;
@@ -81,6 +82,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     protected void initEvent() {
+        mBinding.recordClear.setOnClickListener(v -> onClearRecord());
         mBinding.keyword.setOnEditorActionListener((textView, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE) onSearch();
             return true;
@@ -164,6 +166,15 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     public void onDataChanged(int size) {
         mBinding.recordLayout.setVisibility(size == 0 ? View.GONE : View.VISIBLE);
         if (size == 0) focusFirst(mBinding.wordRecycler);
+    }
+
+    private void onClearRecord() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.search_record)
+                .setMessage(R.string.search_record_clear_tip)
+                .setNegativeButton(R.string.dialog_negative, null)
+                .setPositiveButton(R.string.dialog_positive, (dialog, which) -> mRecordAdapter.clear())
+                .show();
     }
 
     @Override

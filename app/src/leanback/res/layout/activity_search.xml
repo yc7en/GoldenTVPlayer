@@ -88,13 +88,33 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <com.google.android.material.textview.MaterialTextView
-                    android:layout_width="wrap_content"
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="14dp"
-                    android:text="@string/search_record"
-                    android:textColor="@color/white"
-                    android:textSize="24sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/search_record"
+                        android:textColor="@color/white"
+                        android:textSize="24sp" />
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/recordClear"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/search_record_clear"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_search_clear" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recordRecycler"
