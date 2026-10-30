@@ -56,3 +56,13 @@
 -keep class com.google.zxing.qrcode.QRCodeReader { *; }
 -keep class com.google.zxing.qrcode.QRCodeWriter { *; }
 -keep class com.google.zxing.qrcode.decoder.ErrorCorrectionLevel { *; }
+
+# Media3 视频后处理工厂（BugFix-261030-0001）
+# exoplayer 模块不直接依赖 effect 模块，运行期通过反射创建
+# androidx.media3.effect.DefaultVideoFrameProcessor$Factory$Builder，
+# 无 keep 规则时 R8 会移除其构造函数，release 包播放报
+# NoSuchMethodException -> ERROR_CODE_FAILED_RUNTIME_CHECK（提示 Failed Runtime Check）。
+-keep class androidx.media3.effect.DefaultVideoFrameProcessor$Factory$Builder {
+    public <init>();
+}
+
