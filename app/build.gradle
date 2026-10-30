@@ -13,19 +13,24 @@ if (localPropsFile.isFile()) {
     }
 }
 
-// 版本号自 docs/ChangeLog.md 最新条目派生（R-261029-0001）：
+// 版本号自 docs/ChangeLog.md 派生的规则见 R-261030-0002：
 // 条目格式：## 2026-10-29 (v1.0.0)
-//   versionCode = yyyyMMdd（单调递增，供应用内更新比较）
+//   versionCode = yyyyMMdd * 10 + 当日序号（同日多发版本也能单调递增，供应用内更新比较）
 //   versionName = 条目内的语义化版本，与发布版本一致（缺省回落 0.0.0）
+// 当日序号 = ChangeLog 顶部连续同一日期的条目数（最新条目排最前，故最上方条目序号最大）
 def changelog = {
-    def line = rootProject.file('docs/ChangeLog.md').readLines('UTF-8')
-            .find { it ==~ /^##\s+\[?\d{4}-\d{2}-\d{2}.*/ } ?: ''
-    def dm = line =~ /^##\s+\[?(\d{4})-(\d{2})-(\d{2})/
-    def vm = line =~ /\(v?(\d+\.\d+\.\d+)\)/
-    [
-            code: dm.find() ? (dm.group(1) + dm.group(2) + dm.group(3)) : '0',
-            name: vm.find() ? vm.group(1) : '0.0.0'
-    ]
+    def entries = []
+    rootProject.file('docs/ChangeLog.md').readLines('UTF-8').each { line ->
+        def dm = line =~ /^##\s+\[?(\d{4})-(\d{2})-(\d{2})/
+        if (dm.find()) {
+            def vm = line =~ /\(v?(\d+\.\d+\.\d+)\)/
+            entries << [date: dm.group(1) + dm.group(2) + dm.group(3), name: vm.find() ? vm.group(1) : '0.0.0']
+        }
+    }
+    if (entries.isEmpty()) return [code: 0, name: '0.0.0']
+    def head = entries[0]
+    def seq = entries.takeWhile { it.date == head.date }.size()
+    [code: head.date.toInteger() * 10 + seq, name: head.name]
 }()
 
 android {
